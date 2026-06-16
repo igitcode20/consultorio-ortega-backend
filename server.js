@@ -4,7 +4,7 @@
 require('dotenv').config(); 
 
 // =========================================================================
-// 🧪 PASO 2: LOG DE CONTROL (Para que veas en consola si se está leyendo bien)
+// 🧪 PASO 2: LOG DE CONTROL (Para ver en consola si se lee bien en Render)
 // =========================================================================
 console.log("-----------------------------------------");
 console.log("🔍 CONTROL DE VARIABLES DE ENTORNO:");
@@ -21,12 +21,16 @@ const mongoose = require('mongoose');
 const cron = require('node-cron');
 
 // =========================================================================
-// 🚀 PASO 4: INICIALIZAR EXPRESS Y MIDDLEWARES
+// 🚀 PASO 4: INICIALIZAR EXPRESS Y MIDDLEWARES (CORREGIDO PARA EVITAR CORS)
 // =========================================================================
 const app = express();
 
-app.use(cors());
-app.use(express.json()); // Para que el backend entienda JSON en el body
+// 🔥 Permitimos que tanto tu localhost de desarrollo como tu frontend final se conecten sin bloqueos
+app.use(cors({
+  origin: '*', 
+  credentials: true
+}));
+app.use(express.json()); 
 
 // =========================================================================
 // 🔌 PASO 5: CONEXIÓN A LA BASE DE DATOS (MONGOOSE)
@@ -36,12 +40,19 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error('❌ Error crítico al conectar MongoDB:', err));
 
 // =========================================================================
-// 🛣️ PASO 6: IMPORTAR RUTAS (Después de cargar el .env para evitar errores)
+// 🛣️ PASO 6: IMPORTAR TODAS LAS RUTAS (Para evitar los errores 404)
 // =========================================================================
 const appointmentRoutes = require('./routes/appointmentRoutes');
 app.use('/api/appointments', appointmentRoutes);
 
-// Si tenés más rutas en tu proyecto, van aquí abajo:
+// 🚨 AQUÍ ESTABA EL TRUCO: Activamos las rutas que le hacen falta a tu Muro y a tu Farmacia
+const postRoutes = require('./routes/postRoutes');       // Asegúrate de que este archivo exista en tu carpeta routes
+const productRoutes = require('./routes/productRoutes'); // Asegúrate de que este archivo exista en tu carpeta routes
+
+app.use('/api/posts', postRoutes);
+app.use('/api/products', productRoutes);
+
+// Si tenés más rutas en tu proyecto (como autenticación), agrégalas aquí:
 // const authRoutes = require('./routes/authRoutes');
 // app.use('/api/auth', authRoutes);
 
@@ -51,11 +62,9 @@ app.use('/api/appointments', appointmentRoutes);
 const Appointment = require('./models/Appointment');
 const transporter = require('./config/mailer');
 
-// Se ejecuta todos los días a las 08:00 AM hora local de Nicaragua
 cron.schedule('0 8 * * *', async () => {
   console.log('⏰ Iniciando escaneo diario de recordatorios para las citas de mañana...');
   try {
-    // Calculamos el día de mañana de forma segura evitando desfases UTC de los servidores en la nube
     const todayLocal = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Managua" }));
     const tomorrow = new Date(todayLocal);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -63,11 +72,10 @@ cron.schedule('0 8 * * *', async () => {
     const year = tomorrow.getFullYear();
     const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
     const day = String(tomorrow.getDate()).padStart(2, '0');
-    const tomorrowStr = `${year}-${month}-${day}`; // Formato exacto: "YYYY-MM-DD"
+    const tomorrowStr = `${year}-${month}-${day}`; 
 
     console.log(`🔍 Buscando citas confirmadas para la fecha local: ${tomorrowStr}`);
 
-    // Buscamos citas confirmadas para mañana
     const appointmentsTomorrow = await Appointment.find({
       date: tomorrowStr,
       status: 'confirmed'
@@ -80,8 +88,6 @@ cron.schedule('0 8 * * *', async () => {
 
     appointmentsTomorrow.forEach(cita => {
       if (cita.patientId?.email) {
-        
-        // Formateador interno a AM/PM para el mensaje de correo
         let [hours, minutes] = cita.time.split(':');
         let hrs = parseInt(hours, 10);
         const ampm = hrs >= 12 ? 'PM' : 'AM';
@@ -122,7 +128,7 @@ cron.schedule('0 8 * * *', async () => {
   }
 }, {
   scheduled: true,
-  timeZone: "America/Managua" // 🔥 Obliga al reloj a trabajar con la hora de Nicaragua
+  timeZone: "America/Managua"
 });
 
 // =========================================================================
