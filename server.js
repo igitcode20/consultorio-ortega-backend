@@ -43,18 +43,14 @@ mongoose.connect(process.env.MONGO_URI)
 // 🛣️ PASO 6: IMPORTAR TODAS LAS RUTAS (Para evitar los errores 404)
 // =========================================================================
 const appointmentRoutes = require('./routes/appointmentRoutes');
+const postRoutes = require('./routes/postRoutes');       
+const productRoutes = require('./routes/productRoutes'); 
+const authRoutes = require('./routes/authRoutes'); // 🔥 ¡IMPORTADA!
+
 app.use('/api/appointments', appointmentRoutes);
-
-// 🚨 AQUÍ ESTABA EL TRUCO: Activamos las rutas que le hacen falta a tu Muro y a tu Farmacia
-const postRoutes = require('./routes/postRoutes');       // Asegúrate de que este archivo exista en tu carpeta routes
-const productRoutes = require('./routes/productRoutes'); // Asegúrate de que este archivo exista en tu carpeta routes
-
 app.use('/api/posts', postRoutes);
 app.use('/api/products', productRoutes);
-
-// Si tenés más rutas en tu proyecto (como autenticación), agrégalas aquí:
-// const authRoutes = require('./routes/authRoutes');
-// app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes); // 🔥 ¡ACTIVADA PARA EL LOGIN!
 
 // =========================================================================
 // ⏰ PASO 7: TAREA PROGRAMADA (CRON) - RECORDATORIOS AUTOMÁTICOS
