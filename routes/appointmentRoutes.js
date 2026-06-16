@@ -5,116 +5,83 @@ const User = require('../models/User');
 const { protect } = require('../middlewares/authMiddleware'); 
 const transporter = require('../config/mailer'); 
 
-// 1. SOLICITAR UNA CITA (Pacientes)
-router.post('/book', protect, async (expressReq, expressRes) => {
+// 1. SOLICITAR UNA CITA (Ahora usando /create para coincidir con el Front)
+router.post('/create', protect, async (req, res) => {
   try {
-    const { specialty, date, time } = expressReq.body;
+    const { specialty, date, time } = req.body;
     const newAppointment = new Appointment({
-      patientId: expressReq.user.id,
+      patientId: req.user.id,
       specialty,
       date,
       time,
       status: 'pending'
     });
     await newAppointment.save();
-    expressRes.status(201).json({ message: "Solicitud creada correctamente", appointment: newAppointment });
+    res.status(201).json({ message: "✨ Solicitud creada correctamente", appointment: newAppointment });
   } catch (err) {
-    expressRes.status(500).json({ message: "Error", error: err.message });
+    res.status(500).json({ message: "Error al crear la cita", error: err.message });
   }
 });
 
-// 2. OBTENER TODAS LAS CITAS (Admin ve todas, Paciente ve las suyas)
-router.get('/all', protect, async (expressReq, expressRes) => {
+// 2. OBTENER TODAS LAS CITAS
+router.get('/all', protect, async (req, res) => {
   try {
-    if (expressReq.user.role === 'admin') {
+    if (req.user.role === 'admin') {
       const appointments = await Appointment.find()
         .populate('patientId', 'name email')
         .sort({ date: 1, time: 1 });
-      return expressRes.json(appointments);
+      return res.json(appointments);
     } 
-    const myAppointments = await Appointment.find({ patientId: expressReq.user.id }).sort({ createdAt: -1 });
-    expressRes.json(myAppointments);
+    const myAppointments = await Appointment.find({ patientId: req.user.id }).sort({ createdAt: -1 });
+    res.json(myAppointments);
   } catch (err) {
-    expressRes.status(500).json({ message: "Error", error: err.message });
+    res.status(500).json({ message: "Error al obtener citas", error: err.message });
   }
 });
 
-// 3. CAMBIAR ESTADO Y ENVIAR EMAIL AL PACIENTE
-router.put('/:id/status', protect, async (expressReq, expressRes) => {
+// 3. CAMBIAR ESTADO Y ENVIAR EMAIL
+router.put('/:id/status', protect, async (req, res) => {
   try {
-    if (expressReq.user.role !== 'admin') {
-      return expressRes.status(403).json({ message: "Acceso denegado." });
-    }
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Acceso denegado." });
 
-    const { status } = expressReq.body; 
-    
+    const { status } = req.body; 
     const updatedAppointment = await Appointment.findByIdAndUpdate(
-      expressReq.params.id,
+      req.params.id,
       { status },
       { new: true }
     ).populate('patientId', 'name email');
 
-    if (!updatedAppointment) {
-      return expressRes.status(404).json({ message: "No se encontró la cita." });
-    }
+    if (!updatedAppointment) return res.status(404).json({ message: "Cita no encontrada." });
 
-    // 📬 Si la Doctora aprueba, se va el correo al instante
     if (status === 'confirmed' && updatedAppointment.patientId?.email) {
-      
-      // Formateador interno de hora militar a 12h (AM/PM) para el cuerpo del mensaje
-      const formatTime12h = (timeStr) => {
-        let [hours, minutes] = timeStr.split(':');
-        hours = parseInt(hours, 10);
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12;
-        return `${hours}:${minutes} ${ampm}`;
+      const formatTime12h = (t) => {
+        let [h, m] = t.split(':');
+        h = parseInt(h, 10);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        return `${h % 12 || 12}:${m} ${ampm}`;
       };
 
       const mailOptions = {
         from: `"Consultorio Médico Ortega" <${process.env.EMAIL_USER}>`,
         to: updatedAppointment.patientId.email,
         subject: '¡Tu cita médica ha sido Confirmada! 🎉',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <h2 style="color: #0084cc; text-align: center;">¡Hola, ${updatedAppointment.patientId.name}! 👋</h2>
-            <p style="font-size: 1rem; line-height: 1.5; color: #334155; text-align: center;">
-              Te informamos que tu solicitud de cita médica ha sido revisada y exitosamente <strong>Confirmada</strong>.
-            </p>
-            <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0084cc;">
-              <p style="margin: 5px 0;"><strong>🩺 Especialidad:</strong> ${updatedAppointment.specialty}</p>
-              <p style="margin: 5px 0;"><strong>📅 Fecha:</strong> ${updatedAppointment.date}</p>
-              <p style="margin: 5px 0;"><strong>⏰ Hora:</strong> ${formatTime12h(updatedAppointment.time)}</p>
-            </div>
-            <p style="font-size: 0.85rem; color: #64748b; text-align: center;">
-              Si deseas reprogramar o cancelar, por favor comunícate con el consultorio con anticipación.
-            </p>
-            <p style="font-weight: bold; color: #0084cc; text-align: center; margin-top: 25px;">
-              Consultorio Médico Ortega & Castellón
-            </p>
-          </div>
-        `
+        html: `<div><h2>¡Hola, ${updatedAppointment.patientId.name}!</h2><p>Tu cita ha sido confirmada.</p></div>`
       };
-
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) console.error("❌ Error enviando email de confirmación:", error);
-        else console.log("📧 Email de confirmación enviado a:", updatedAppointment.patientId.email);
-      });
+      transporter.sendMail(mailOptions);
     }
-
-    expressRes.json({ message: "Estado actualizado", appointment: updatedAppointment });
+    res.json({ message: "Estado actualizado", appointment: updatedAppointment });
   } catch (err) {
-    expressRes.status(500).json({ message: "Error", error: err.message });
+    res.status(500).json({ message: "Error al actualizar", error: err.message });
   }
 });
 
-// 4. OBTENER PACIENTES TOTALES
-router.get('/users', protect, async (expressReq, expressRes) => {
+router.get('/users', protect, async (req, res) => {
   try {
-    if (expressReq.user.role !== 'admin') return expressRes.status(403).json({ message: "Acceso denegado." });
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Acceso denegado." });
     const patients = await User.find({ role: 'patient' }).select('name email');
-    expressRes.json(patients);
+    res.json(patients);
   } catch (err) {
-    expressRes.status(500).json({ message: "Error", error: err.message });
+    res.status(500).json({ message: "Error", error: err.message });
   }
 });
 
