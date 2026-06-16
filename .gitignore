@@ -1,0 +1,11 @@
+# Dependencias (son muy pesadas para subirlas a GitHub)
+node_modules/
+
+# Variables de entorno secretas (¡Súper importante!)
+.env
+
+# Archivos sueltos del sistema operativo o logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
