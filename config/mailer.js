@@ -1,3 +1,5 @@
+// config/mailer.js
+
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
@@ -8,7 +10,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Verificación automática en consola al arrancar el backend
+// Verificar conexión
 transporter.verify((error, success) => {
   if (error) {
     console.log('⚠️ Error en la configuración de correos:', error.message);
