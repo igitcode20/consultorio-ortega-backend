@@ -1,3 +1,5 @@
+// middlewares/authMiddleware.js
+
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
@@ -9,8 +11,6 @@ const protect = async (req, res, next) => {
             token = token.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             
-            // 🔥 Buscamos al usuario real en la base de datos
-            // Así garantizamos que 'req.user' siempre tenga _id, role y name
             const user = await User.findById(decoded.id || decoded._id).select('-password');
             
             if (!user) {

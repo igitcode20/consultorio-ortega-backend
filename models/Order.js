@@ -44,7 +44,7 @@ const OrderSchema = new mongoose.Schema({
         default: 'pending'
     },
     paymentProof: {
-        type: String, // URL o base64 del comprobante
+        type: String,
         default: ''
     },
     orderStatus: {

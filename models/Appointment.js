@@ -11,7 +11,7 @@ const AppointmentSchema = new mongoose.Schema({
   specialty: {
     type: String,
     required: true,
-    enum: ['Medicina General', 'Ortopedia', 'Pediatría', 'Consulta General', 'Ginecología']  // ✅ AGREGADOS
+    enum: ['Medicina General', 'Ortopedia', 'Pediatría', 'Consulta General', 'Ginecología']
   },
   date: {
     type: String,

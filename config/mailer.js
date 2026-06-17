@@ -10,7 +10,6 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Verificar conexión
 transporter.verify((error, success) => {
   if (error) {
     console.log('⚠️ Error en la configuración de correos:', error.message);
