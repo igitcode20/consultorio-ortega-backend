@@ -1,4 +1,4 @@
-// controllers/orderController.js
+// controllers/orderController.js - COMPLETO
 
 const Order = require('../models/Order');
 const Product = require('../models/Product');
@@ -15,7 +15,6 @@ exports.createOrder = async (req, res) => {
         const { products, address, department, phone, deliveryNotes } = req.body;
         const userId = req.user._id || req.user.id;
 
-        // Validar campos obligatorios
         if (!products || products.length === 0) {
             return res.status(400).json({ message: '❌ El carrito está vacío' });
         }
@@ -24,20 +23,17 @@ exports.createOrder = async (req, res) => {
             return res.status(400).json({ message: '❌ La dirección es obligatoria' });
         }
 
-        // 🔥 SOLO JUICIALPA - CHONTALES
         if (department !== 'Juigalpa') {
             return res.status(400).json({ 
-                message: '❌ El servicio de delivery solo está disponible en Juigalpa, Chontales. Por favor, selecciona Juigalpa como departamento.' 
+                message: '❌ El servicio de delivery solo está disponible en Juigalpa, Chontales.' 
             });
         }
 
-        // Buscar usuario
         const user = await User.findById(userId).maxTimeMS(5000);
         if (!user) {
             return res.status(404).json({ message: '❌ Usuario no encontrado' });
         }
 
-        // Procesar productos
         let totalAmount = 0;
         const orderProducts = [];
         
@@ -64,10 +60,8 @@ exports.createOrder = async (req, res) => {
             totalAmount += product.price * item.quantity;
         }
 
-        // Costo de envío base para Juigalpa
         const shippingCost = 40;
 
-        // Crear pedido
         const order = await Order.create({
             userId,
             products: orderProducts,
@@ -81,7 +75,6 @@ exports.createOrder = async (req, res) => {
             deliveryNotes: deliveryNotes || ''
         });
 
-        // Reducir stock
         for (const item of products) {
             await Product.findByIdAndUpdate(item.productId, {
                 $inc: { stock: -item.quantity }
@@ -125,7 +118,6 @@ exports.uploadPaymentProof = async (req, res) => {
             return res.status(404).json({ message: '❌ Pedido no encontrado' });
         }
 
-        // Verificar que el usuario sea el dueño del pedido
         if (order.userId.toString() !== req.user._id.toString()) {
             return res.status(403).json({ message: '❌ No autorizado' });
         }
@@ -151,7 +143,7 @@ exports.uploadPaymentProof = async (req, res) => {
 };
 
 // ============================================
-// 📋 OBTENER PEDIDOS DE UN USUARIO (NUEVA)
+// 📋 OBTENER PEDIDOS DE UN USUARIO
 // ============================================
 exports.getUserOrders = async (req, res) => {
     try {
@@ -304,5 +296,88 @@ exports.getStats = async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+// ============================================
+// 📊 REPORTE DE VENTAS (NUEVA)
+// ============================================
+exports.getSalesReport = async (req, res) => {
+    try {
+        const { period } = req.query;
+        
+        console.log(`📊 Generando reporte de ventas - Período: ${period || 'monthly'}`);
+        
+        let startDate = new Date();
+        switch(period) {
+            case 'daily':
+                startDate.setHours(0, 0, 0, 0);
+                break;
+            case 'weekly':
+                startDate.setDate(startDate.getDate() - 7);
+                break;
+            case 'monthly':
+                startDate.setMonth(startDate.getMonth() - 1);
+                break;
+            case 'quarterly':
+                startDate.setMonth(startDate.getMonth() - 3);
+                break;
+            default:
+                startDate = new Date(0);
+        }
+
+        const orders = await Order.find({
+            createdAt: { $gte: startDate },
+            paymentStatus: 'confirmed'
+        }).populate('userId', 'name email phone department');
+
+        const totalSales = orders.reduce((sum, order) => sum + order.totalAmount + order.shippingCost, 0);
+        const totalOrders = orders.length;
+
+        const byDepartment = {};
+        orders.forEach(order => {
+            const dept = order.department || 'Desconocido';
+            byDepartment[dept] = (byDepartment[dept] || 0) + 1;
+        });
+
+        const productSales = {};
+        orders.forEach(order => {
+            order.products.forEach(product => {
+                const key = product.productId ? product.productId.toString() : product.name;
+                if (!productSales[key]) {
+                    productSales[key] = {
+                        name: product.name,
+                        quantity: 0,
+                        revenue: 0
+                    };
+                }
+                productSales[key].quantity += product.quantity;
+                productSales[key].revenue += product.price * product.quantity;
+            });
+        });
+
+        const topProducts = Object.values(productSales)
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 10);
+
+        res.json({
+            period: period || 'all',
+            startDate,
+            summary: {
+                totalSales,
+                totalOrders,
+                averageOrderValue: totalOrders > 0 ? totalSales / totalOrders : 0
+            },
+            byDepartment,
+            topProducts,
+            orders: orders.slice(0, 50)
+        });
+
+    } catch (error) {
+        console.error('❌ Error en getSalesReport:', error);
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Error al generar el reporte de ventas'
+        });
     }
 };
