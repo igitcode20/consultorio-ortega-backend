@@ -2,19 +2,20 @@
 
 const Appointment = require('../models/Appointment');
 const User = require('../models/User');
+const transporter = require('../config/mailer');
+const { 
+    getAppointmentConfirmationTemplate,
+    getReminderTemplate 
+} = require('../utils/emailTemplates');
 
-// 📧 Función para enviar correo (SIMPLIFICADA)
-const sendSimpleEmail = async (to, subject, html) => {
+// 📧 Función para enviar correo
+const sendEmail = async (to, subject, html) => {
     try {
-        // Si no hay destinatario, salir
         if (!to) {
             console.log('⚠️ No hay email para enviar');
             return false;
         }
 
-        // Importar transporter solo cuando se necesite
-        const transporter = require('../config/mailer');
-        
         const mailOptions = {
             from: `"Consultorio Ortega Castellón" <${process.env.EMAIL_USER}>`,
             to,
@@ -31,45 +32,12 @@ const sendSimpleEmail = async (to, subject, html) => {
     }
 };
 
-// 📝 Función para formatear hora
-const formatTime = (time) => {
-    if (!time) return 'No especificada';
-    let [hours, minutes] = time.split(':');
-    let hrs = parseInt(hours, 10);
-    const ampm = hrs >= 12 ? 'PM' : 'AM';
-    hrs = hrs % 12 || 12;
-    return `${hrs}:${minutes} ${ampm}`;
-};
-
-// 📧 Plantilla de confirmación (SIMPLIFICADA)
-const getConfirmationTemplate = (patient, appointment) => {
-    const timeFormatted = formatTime(appointment.time);
-    
-    return {
-        subject: '✅ ¡Tu Cita Médica ha sido Confirmada!',
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px solid #22c55e; border-radius: 12px;">
-                <h2 style="color: #22c55e; text-align: center;">✅ Cita Confirmada</h2>
-                <p>Hola <strong>${patient.name}</strong>,</p>
-                <p>Tu cita médica ha sido <strong style="color: #22c55e;">confirmada</strong>.</p>
-                <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                    <p><strong>🩺 Especialidad:</strong> ${appointment.specialty}</p>
-                    <p><strong>📅 Fecha:</strong> ${appointment.date}</p>
-                    <p><strong>⏰ Hora:</strong> ${timeFormatted}</p>
-                </div>
-                <p><strong>📍 Ubicación:</strong> Juigalpa Chontales, Barrio San Antonio</p>
-                <p><strong>📞 Teléfono:</strong> 84334235</p>
-                <hr>
-                <p style="font-size: 12px; color: #64748b; text-align: center;">© 2026 Consultorio Ortega Castellón</p>
-            </div>
-        `
-    };
-};
-
-// 📝 CREAR CITA - VERSIÓN SIMPLIFICADA Y SEGURA
+// 📝 CREAR CITA
 exports.createAppointment = async (req, res) => {
     try {
         console.log('📝 Creando cita...');
+        console.log('📝 Body:', req.body);
+        console.log('📝 User ID:', req.user?._id || req.user?.id);
         
         const { specialty, date, time } = req.body;
         const userId = req.user._id || req.user.id;
@@ -77,7 +45,7 @@ exports.createAppointment = async (req, res) => {
         // Validar campos obligatorios
         if (!specialty || !date || !time) {
             return res.status(400).json({ 
-                message: '❌ Todos los campos son obligatorios' 
+                message: '❌ Todos los campos son obligatorios: specialty, date, time' 
             });
         }
 
@@ -111,7 +79,6 @@ exports.createAppointment = async (req, res) => {
 ⏰ Hora: ${appointment.time}
         `);
 
-        // Respuesta exitosa
         res.status(201).json({ 
             message: '✨ Solicitud creada con éxito. Espera la confirmación del médico.', 
             appointment 
@@ -129,6 +96,8 @@ exports.createAppointment = async (req, res) => {
 // 📋 OBTENER TODAS LAS CITAS
 exports.getAllAppointments = async (req, res) => {
     try {
+        console.log('📋 Obteniendo citas...');
+        
         if (req.user.role === 'admin') {
             const appointments = await Appointment.find()
                 .populate('patientId', 'name email phone department')
@@ -147,18 +116,16 @@ exports.getAllAppointments = async (req, res) => {
     }
 };
 
-// ✅ ACTUALIZAR ESTADO DE LA CITA - CON ENVÍO DE CORREO
+// ✅ ACTUALIZAR ESTADO DE LA CITA
 exports.updateAppointmentStatus = async (req, res) => {
     try {
         const { status } = req.body;
         console.log(`📝 Actualizando cita ${req.params.id} a: ${status}`);
 
-        // Validar estado
         if (!['pending', 'confirmed', 'rejected'].includes(status)) {
             return res.status(400).json({ message: '❌ Estado no válido' });
         }
 
-        // Actualizar cita
         const appointment = await Appointment.findByIdAndUpdate(
             req.params.id, 
             { status }, 
@@ -175,9 +142,9 @@ exports.updateAppointmentStatus = async (req, res) => {
         if (status === 'confirmed' && appointment.patientId && appointment.patientId.email) {
             try {
                 const patient = appointment.patientId;
-                const template = getConfirmationTemplate(patient, appointment);
+                const template = getAppointmentConfirmationTemplate(patient, appointment);
                 
-                await sendSimpleEmail(
+                await sendEmail(
                     patient.email,
                     template.subject,
                     template.html
