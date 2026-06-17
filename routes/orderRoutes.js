@@ -5,11 +5,10 @@ const router = express.Router();
 const orderController = require('../controllers/orderController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
-// 🔥 RUTA PARA CREAR PEDIDO
+// 🔥 RUTAS PARA CLIENTES (PACIENTES)
 router.post('/create', protect, orderController.createOrder);
-
-// 🔥 RUTA PARA SUBIR COMPROBANTE (NUEVA)
 router.post('/:orderId/upload-proof', protect, orderController.uploadPaymentProof);
+router.get('/my-orders', protect, orderController.getUserOrders); // 🆕 NUEVA
 
 // Rutas de administrador
 router.get('/all', protect, admin, orderController.getAllOrders);

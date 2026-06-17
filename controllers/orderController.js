@@ -107,12 +107,12 @@ exports.createOrder = async (req, res) => {
 };
 
 // ============================================
-// 📤 SUBIR COMPROBANTE DE PAGO (NUEVA)
+// 📤 SUBIR COMPROBANTE DE PAGO
 // ============================================
 exports.uploadPaymentProof = async (req, res) => {
     try {
         const { orderId } = req.params;
-        const { paymentProof } = req.body; // Base64 de la imagen
+        const { paymentProof } = req.body;
         
         console.log(`📤 Subiendo comprobante para orden ${orderId}`);
 
@@ -130,9 +130,8 @@ exports.uploadPaymentProof = async (req, res) => {
             return res.status(403).json({ message: '❌ No autorizado' });
         }
 
-        // Guardar comprobante
         order.paymentProof = paymentProof;
-        order.paymentStatus = 'pending'; // Esperando confirmación del admin
+        order.paymentStatus = 'pending';
         await order.save({ maxTimeMS: 5000 });
 
         console.log(`✅ Comprobante subido para orden ${orderId}`);
@@ -147,6 +146,32 @@ exports.uploadPaymentProof = async (req, res) => {
         res.status(500).json({ 
             error: error.message,
             message: 'Error al subir el comprobante'
+        });
+    }
+};
+
+// ============================================
+// 📋 OBTENER PEDIDOS DE UN USUARIO (NUEVA)
+// ============================================
+exports.getUserOrders = async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        console.log(`📋 Obteniendo pedidos del usuario ${userId}`);
+
+        const orders = await Order.find({ userId })
+            .sort({ createdAt: -1 })
+            .lean()
+            .maxTimeMS(5000);
+
+        console.log(`✅ ${orders.length} pedidos encontrados`);
+
+        res.json(orders);
+
+    } catch (error) {
+        console.error('❌ Error en getUserOrders:', error);
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Error al obtener tus pedidos'
         });
     }
 };
@@ -196,7 +221,7 @@ exports.confirmPayment = async (req, res) => {
 };
 
 // ============================================
-// 📋 OBTENER TODOS LOS PEDIDOS
+// 📋 OBTENER TODOS LOS PEDIDOS (ADMIN)
 // ============================================
 exports.getAllOrders = async (req, res) => {
     try {
