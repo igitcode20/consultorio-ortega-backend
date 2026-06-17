@@ -4,7 +4,7 @@ const Appointment = require('../models/Appointment');
 const User = require('../models/User');
 const transporter = require('../config/mailer');
 
-// 📧 Función para enviar correo (simplificada)
+// 📧 Función para enviar correo
 const sendEmail = async (to, subject, html) => {
     try {
         if (!to) return false;
@@ -58,7 +58,7 @@ const getConfirmationTemplate = (patient, appointment) => {
 };
 
 // ============================================
-// 📝 CREAR CITA - CON TIME-OUT Y VALIDACIONES
+// 📝 CREAR CITA
 // ============================================
 exports.createAppointment = async (req, res) => {
     try {
@@ -67,14 +67,12 @@ exports.createAppointment = async (req, res) => {
         const { specialty, date, time } = req.body;
         const userId = req.user._id || req.user.id;
         
-        // Validar campos
         if (!specialty || !date || !time) {
             return res.status(400).json({ 
                 message: '❌ Todos los campos son obligatorios' 
             });
         }
 
-        // Buscar paciente con timeout
         const patient = await User.findById(userId).maxTimeMS(5000);
         if (!patient) {
             return res.status(404).json({ message: '❌ Paciente no encontrado' });
@@ -82,7 +80,6 @@ exports.createAppointment = async (req, res) => {
 
         console.log(`👤 Paciente: ${patient.name}`);
 
-        // Crear cita con timeout
         const appointment = await Appointment.create({
             patientId: userId,
             specialty,
@@ -100,13 +97,6 @@ exports.createAppointment = async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error en createAppointment:', error);
-        
-        if (error.name === 'MongoTimeoutError') {
-            return res.status(504).json({ 
-                message: '⚠️ La base de datos está tardando. Intenta de nuevo.' 
-            });
-        }
-        
         res.status(500).json({ 
             message: 'Error al guardar la cita', 
             error: error.message 
@@ -115,7 +105,7 @@ exports.createAppointment = async (req, res) => {
 };
 
 // ============================================
-// 📋 OBTENER CITAS - RÁPIDO Y OPTIMIZADO
+// 📋 OBTENER CITAS
 // ============================================
 exports.getAllAppointments = async (req, res) => {
     try {
@@ -146,7 +136,7 @@ exports.getAllAppointments = async (req, res) => {
 };
 
 // ============================================
-// ✅ ACTUALIZAR ESTADO - RESPUESTA INMEDIATA
+// ✅ ACTUALIZAR ESTADO
 // ============================================
 exports.updateAppointmentStatus = async (req, res) => {
     try {

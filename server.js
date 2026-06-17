@@ -16,7 +16,6 @@ app.use(cors({
     credentials: true
 }));
 
-// Aumentar límite de tamaño para imágenes
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -28,7 +27,7 @@ app.use((req, res, next) => {
 });
 
 // ============================================
-// CONEXIÓN A MONGODB CON TIME-OUTS
+// CONEXIÓN A MONGODB
 // ============================================
 mongoose.connect(process.env.MONGO_URI, {
     serverSelectionTimeoutMS: 10000,
