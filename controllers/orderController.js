@@ -107,6 +107,51 @@ exports.createOrder = async (req, res) => {
 };
 
 // ============================================
+// 📤 SUBIR COMPROBANTE DE PAGO (NUEVA)
+// ============================================
+exports.uploadPaymentProof = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { paymentProof } = req.body; // Base64 de la imagen
+        
+        console.log(`📤 Subiendo comprobante para orden ${orderId}`);
+
+        if (!paymentProof) {
+            return res.status(400).json({ message: '❌ El comprobante es obligatorio' });
+        }
+
+        const order = await Order.findById(orderId).maxTimeMS(5000);
+        if (!order) {
+            return res.status(404).json({ message: '❌ Pedido no encontrado' });
+        }
+
+        // Verificar que el usuario sea el dueño del pedido
+        if (order.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: '❌ No autorizado' });
+        }
+
+        // Guardar comprobante
+        order.paymentProof = paymentProof;
+        order.paymentStatus = 'pending'; // Esperando confirmación del admin
+        await order.save({ maxTimeMS: 5000 });
+
+        console.log(`✅ Comprobante subido para orden ${orderId}`);
+
+        res.json({
+            message: '✅ Comprobante subido exitosamente. Espera la confirmación del administrador.',
+            order
+        });
+
+    } catch (error) {
+        console.error('❌ Error en uploadPaymentProof:', error);
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Error al subir el comprobante'
+        });
+    }
+};
+
+// ============================================
 // ✅ CONFIRMAR PAGO
 // ============================================
 exports.confirmPayment = async (req, res) => {
