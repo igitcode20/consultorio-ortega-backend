@@ -1,15 +1,17 @@
+// models/Appointment.js
+
 const mongoose = require('mongoose');
 
 const AppointmentSchema = new mongoose.Schema({
   patientId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // Asegúrate de que apunte a tu modelo de Usuarios
+    ref: 'User',
     required: true
   },
   specialty: {
     type: String,
     required: true,
-    enum: ['Medicina General', 'Ortopedia', 'Pediatría']
+    enum: ['Medicina General', 'Ortopedia', 'Pediatría', 'Consulta General', 'Ginecología']  // ✅ AGREGADOS
   },
   date: {
     type: String,
@@ -19,11 +21,10 @@ const AppointmentSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  // 🔥 ESTE ES EL CAMPO NUEVO QUE DEBÉS AGREGAR:
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'rejected'],
-    default: 'pending' 
+    default: 'pending'
   }
 }, { timestamps: true });
 
